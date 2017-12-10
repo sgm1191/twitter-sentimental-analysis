@@ -3,4 +3,4 @@
 3. Se normalizan las urls[URL], los nombres de usuario[USR] y los hashtags[HASHTAG] y se convierten a lowercase
   3.1 se escribe un script en python3 para normalizar se usa de la siguiente manera:
             python3 preprocess.py > nombre_archivo.ds
-4. 
+4. Se corre el script tf_word2vec_nce.py que genera 3 archivos binarios en model/*.pkl, los archivos contienen las variables donde se guardan los diccionarios del vocabulario y sus embeddings

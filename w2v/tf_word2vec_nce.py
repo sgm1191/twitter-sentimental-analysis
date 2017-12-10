@@ -33,9 +33,7 @@ import pickle
 
 import re
 
-# SCRIPT PARA PREPROCESAR TWITS
-# normalizar URLs, usuarios y hashtags
-
+#############################   TOKENIZER   ###################################
 emoticons_str = r"""
     (?:
         [:=;] # Eyes
@@ -70,11 +68,6 @@ def preprocess(s, lowercase=False):
 
 ################################################################################
 # Read the data into a list of strings.
-# def read_data(filename):
-#   """Extract the first file enclosed in a zip file as a list of words."""
-#   with zipfile.ZipFile(filename) as f:
-#     data = tf.compat.as_str(f.read(f.namelist()[0])).split()
-#   return data
 
 def read_data(filename):
     """ Lee el documento como una lista de palabras"""
@@ -89,7 +82,9 @@ filename = 'data/n-cleansed_150k.ds'
 vocabulary = read_data(filename)
 print('Data size = ', len(vocabulary))
 
-# Step 2: Build the dictionary and replace rare words with UNK token.
+##########################   PREPARE DATA   ####################################
+
+# Build the dictionary and replace rare words with UNK token.
 vocabulary_size = 55000
 
 def build_dataset(words, n_words):
