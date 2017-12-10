@@ -1,0 +1,6 @@
+1. Se  descarga la muestra de 250000 twits(cleansed_aa.ds) de la liga que se encuentra en el archivo readme.data.
+2. Se obtiene un subsampleo de 150K twits del archivo cleansed_aa.ds -> cleansed_150K.ds
+3. Se normalizan las urls[URL], los nombres de usuario[USR] y los hashtags[HASHTAG] y se convierten a lowercase
+  3.1 se escribe un script en python3 para normalizar se usa de la siguiente manera:
+            python3 preprocess.py > nombre_archivo.ds
+4. 

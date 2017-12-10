@@ -1,0 +1,16 @@
+# muestra de los datos originales para embeddings 250000 twits
+cleansed_aa.ds https://www.dropbox.com/s/ejsk1dwz5stliey/cleansed_aa.ds?dl=0
+
+# datos para entrenamiento de embeddings ~8M de twits
+cleansed.ds https://www.dropbox.com/s/e2wydfwnnqmgrwa/cleansed.ds?dl=0
+
+# twits positivos y negativos para pre-entrenamiento (intended for the distant approach[1])
+https://www.dropbox.com/s/igi52x84qllp56b/tw-data.neg?dl=0
+https://www.dropbox.com/s/y93poywml4xfi9o/tw-data.pos?dl=0
+
+# datos de entrenamiento usados en SemEval2015 para tareas A y B(son los mismos del 2013)
+SemEval2013 train subtask a https://www.dropbox.com/s/ad39i1869tmdyxl/downloaded-avail-a.ds?dl=0
+SemEval2013 train subtask b https://www.dropbox.com/s/23d25jbbjfobob2/downloaded-avail-b.ds?dl=0
+
+referencias
+[1] Go, A., Bhayani, R., & Huang, L. (2009). Twitter sentiment classification using distant supervision. CS224N Project Report, Stanford, 1(2009), 12.

@@ -1,0 +1,3 @@
+*.ds
+# variables guardadas con pickle
+*.pkl
