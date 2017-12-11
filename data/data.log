@@ -1,0 +1,11 @@
+1. se descargan los datos para pre-entrenamiento(negativos y positivos) del archivo readme.data
+  1.1[op] se cambian los nombres a tw-data.*.ds
+
+2. se agregan etiquetas para cada  archivo con las siguientes instrucciones
+                        sed -e 's/$/ \t negative/' -i tw-data.neg.ds
+                        sed -e 's/$/ \t positive/' -i tw-data.pos.ds
+
+3. se mezclan los datos en un solo archivo con la siguiente instrucción
+            awk 'BEGIN { srand() } { print rand(), $0 }' tw-data.neg.ds tw-data.pos.ds | sort -n | cut -f2- -d" " > distant-data.ds
+
+4. se eliminan los archivos originales quedándonos con distant-data.ds
