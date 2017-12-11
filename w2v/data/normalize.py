@@ -42,11 +42,11 @@ with open(filename) as f:
         new_line = []
         for word in preprocess(line, lowercase=True):
             if word.startswith('@'):
-                new_line += ['<USER>']
+                new_line += ['<NAME/>']
             elif word.startswith('http'):
-                new_line += ['<URL>']
+                new_line += ['<LINK/>']
             elif word.startswith('#'):
-                new_line += ['<HASHTAG>']
+                new_line += ['<HASHTAG/>']
             else:
                 new_line += [word]
         print(' '.join(new_line))

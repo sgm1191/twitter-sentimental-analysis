@@ -74,7 +74,7 @@ def read_data(filename):
     data = []
     with open(filename) as f:
         for line in f:
-            for word in preprocess(line, lowercase=True):
+            for word in preprocess(line):
                 data += [word]
     return data
 
