@@ -74,12 +74,12 @@ def read_data(filename, outfile, sen_len=400):
         else:
           word = word.lower()
         if word in w_dict:
-          sen_matrix += [ emb[ w_dict[ word ] ] ]
+          sen_matrix += [ [x] for x in emb[ w_dict[ word ] ] ]
         else:
-          sen_matrix += [ emb[ w_dict[ 'UNK' ] ] ]
+          sen_matrix += [ [x] for x in emb[ w_dict[ 'UNK' ] ] ]
       missing = sen_len - len(sen_matrix)
       for x in range(missing):
-        sen_matrix += [ emb[ w_dict[ 'UNK' ] ] ] ## embeddings of lenght 100 each
+        sen_matrix += [ [x] for x in emb[ w_dict[ 'UNK' ] ] ] ## embeddings of lenght 100 each
       pk.dump([[sen_matrix],[label.strip()]], vars)
 
 class Cnn:
@@ -101,7 +101,7 @@ class Cnn:
     """ Defines inputs """
     with tf.name_scope('input'):
       # placeholder for X
-      self.X = tf.placeholder(tf.float32, [1000,self.sen_siz, self.embed_size,1], name='X')
+      self.X = tf.placeholder(tf.float32, [None,self.sen_siz, self.embed_size,1], name='X')
       # placeholder for Y
       self.Y_true = tf.placeholder(tf.float32, [None, 3], name='Y')
       self.l2_loss = tf.constant(0.0)
