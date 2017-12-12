@@ -45,6 +45,7 @@ def read_data(filename, outfile, sen_len=400):
       w_dict = pk.load(f)
     vars = open(outfile,'wb')
     for elem in tqdm(reader):
+      i +=1
       text,label = elem.split('ññ')
       sen_matrix = []
       for word in preprocess(text):
@@ -57,13 +58,14 @@ def read_data(filename, outfile, sen_len=400):
         else:
           word = word.lower()
         if word in w_dict:
-          sen_matrix += [ [x] for x in emb[ w_dict[ word ] ] ]
+          sen_matrix += [[ [x] for x in emb[ w_dict[ word ] ] ]]
         else:
-          sen_matrix += [ [x] for x in emb[ w_dict[ 'UNK' ] ] ]
+          sen_matrix += [[ [x] for x in emb[ w_dict[ 'UNK' ] ] ]]
       missing = sen_len - len(sen_matrix)
       for x in range(missing):
-        sen_matrix += [ [x] for x in emb[ w_dict[ 'UNK' ] ] ] ## embeddings of len
+        sen_matrix += [[ [x] for x in emb[ w_dict[ 'UNK' ] ] ]] ## embeddings of len
       pk.dump([[sen_matrix],[label.strip()]], vars)
 
 
-read_data(filename='data/distant-data.ds', outfile='temp_dist_mat.pkl')
+
+read_data(filename='data/distant-data.ds', outfile='data/temp_dist_mat.pkl')
