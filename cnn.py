@@ -54,7 +54,7 @@ def preprocess(s, lowercase=False):
         tokens = [token if emoticon_re.search(token) else token.lower() for token in tokens]
     return tokens
 
-def read_data(filename, sen_len=400, outfile):
+def read_data(filename, outfile, sen_len=400):
     reader = open(filename)
     with open('w2v/model/nce_embeddings.pkl','rb') as f:
       emb = pk.load(f)
@@ -101,7 +101,7 @@ class Cnn:
     """ Defines inputs """
     with tf.name_scope('input'):
       # placeholder for X
-      self.X = tf.placeholder(tf.float32, [sen_siz, self.embed_size], name='X')
+      self.X = tf.placeholder(tf.float32, [1000,self.sen_siz, self.embed_size,1], name='X')
       # placeholder for Y
       self.Y_true = tf.placeholder(tf.float32, [None, 3], name='Y')
       self.l2_loss = tf.constant(0.0)
@@ -111,11 +111,11 @@ class Cnn:
     with tf.name_scope('params'):
       # First convolutional layer - maps one grayscale image to 2x32 feature maps.
       with tf.name_scope('conv'):
-        self.W_cn = self.weight_variable([5, self.embed_size, 1, self.fm_num], v_name="wcn")
+        self.W_cn = self.weight_variable([self.filter_size, self.embed_size, 1, self.fm_num], v_name="wcn")
         self.b_cn = self.bias_variable([self.fm_num], v_name="bcn")
       with tf.name_scope('fc_softmax'):
-        self.W_fc = self.weight_variable([300, 3], v_name="wfc") ## por los 300 mapas de características reducidos por max pooling
-        self.b_fc = self.bias_variable([3], name="bfc")
+        self.W_fc = self.weight_variable([self.fm_num, 3], v_name="wfc") ## por los 300 mapas de características reducidos por max pooling
+        self.b_fc = self.bias_variable([3], v_name="bfc")
 
   def def_model(self):
     """ Defines the model """
@@ -125,8 +125,8 @@ class Cnn:
     W_fcm = self.W_fc
     b_fcm = self.b_fc
     # First convolutional layer - maps one grayscale image to 32 feature maps.
-    with tf.name_scope('zero_padding'):
-      zero_x = tf.pad(Xm,[[0,0],[0,self.sen_siz - self.X.shape[0]]])
+    #with tf.name_scope('zero_padding'):
+    #  zero_x = tf.pad(Xm,[[0,0],[0,self.sen_siz - self.X.shape[0]]])
 
     with tf.name_scope('conv'):
       h_cn1 = tf.nn.relu(tf.nn.bias_add(self.conv2d(Xm, W_cnm), b_cnm))
@@ -135,12 +135,13 @@ class Cnn:
       h_max_pool = self.max_pool(h_cn1)
     with tf.name_scope('dropout'):
       h_drop = tf.nn.dropout(h_max_pool, .5) ## probabilidad de dropout
+      h_flat = tf.reshape(h_drop,[-1,self.fm_num])
     with tf.name_scope('fc_softmax'):
       self.l2_loss += tf.nn.l2_loss(self.W_cn)
       self.l2_loss += tf.nn.l2_loss(self.b_cn)
       self.l2_loss += tf.nn.l2_loss(self.W_fc)
       self.l2_loss += tf.nn.l2_loss(self.b_fc)
-      self.Y_logt = tf.nn.xw_plus_b(h_drop, W_fcm, b_fcm, name='scores')
+      self.Y_logt = tf.nn.xw_plus_b(h_flat, W_fcm, b_fcm, name='scores')
       self.Y_pred = tf.nn.softmax(self.Y_logt)
 
   def def_output(self):
@@ -153,7 +154,7 @@ class Cnn:
     """ Defines loss function """
     with tf.name_scope('loss'):
       # cross entropy
-      self.cross_entropy = (tf.nn.softmax_cross_entropy_with_logits(self.Y_logt,self.Y_true)
+      self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=self.Y_logt,labels=self.Y_true)
       ### lambda de penalización = 0.0001
       self.loss = tf.reduce_mean(self.cross_entropy)+0.001*self.l2_loss
 
@@ -179,7 +180,7 @@ class Cnn:
 
   def max_pool(self, x):
     """max_pool_2x2 downsamples a feature map by 2X."""
-    return tf.nn.max_pool(x, ksize=[1,self.sen_len-5+1,1,1],
+    return tf.nn.max_pool(x, ksize=[1,self.sen_siz-5+1,1,1],
                         strides = [1,1,1,1],
                         padding='VALID')
 
@@ -193,7 +194,7 @@ class Cnn:
     initial = tf.constant(0.1, shape=shape)
     return tf.Variable(initial, name=v_name)
 
-  def train(self, data, labels):
+  def train(self):
     """ Trains the model """
     # creates optimizer
     grad = tf.train.AdadeltaOptimizer(learning_rate=.95)
@@ -244,19 +245,20 @@ def run():
   # Tensorflow integrates MNIST dataset
   print("reading data...")
   if not Path("data/temp_dist_mat.pkl").exists():
-    read_data('data/distant-data.ds', sen_len=400, outfile='data/temp_dist_mat.pkl')
+    read_data(filename='data/distant-data.ds', sen_len=400, outfile='data/temp_dist_mat.pkl')
 
   # defines our model
   print("instantiating the model...")
   model = Cnn(400, 100, 5, 300)
   # trains our model
   print("training the model...")
-  model.train(data, labels)
+  model.train()
 
 def main(args):
   run()
-  return 0
 
 if __name__ == '__main__':
   import sys
-  sys.exit(main(sys.argv))
+  main(sys.argv)
+  data_file.close()
+  sys.exit(0)
