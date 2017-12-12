@@ -43,32 +43,32 @@ def preprocess(s, lowercase=False):
     return tokens
 
 def read_data(filename, sen_len=400):
-    with pd.read_csv(filename, delimiter='ññ', header=None, engine='python') as data:
-        with open('w2v/model/nce_embeddings.pkl','rb') as f:
-            emb = pk.load(f)
-        with open('w2v/model/nce_dict.pkl','rb') as f:
-            w_dict = pk.load(f)
-        data = []
-        for tweet in data[0][:]:
-            sen_matrix = []
-            for word in preprocess(tweet):
-                if word.startswith('@'):
-                    word = '<USER/>'
-                elif word.startswith('http'):
-                    word = '<URL/>'
-                elif word.startswith('#'):
-                    word = '<HASHTAG/>'
-                else:
-                    word = word.lower()
-                if word in w_dict:
-                    sen_matrix += [ emb[ w_dict[ word ] ] ]
-                else:
-                    sen_matrix += [ emb[ w_dict[ 'UNK' ] ] ]
-            ## UNK padding
-            missing = sen_len - len(sen_matrix)
-            for x in range(missing):
-                sen_matrix += [ emb[ w_dict[ 'UNK' ] ] ## embeddings of lenght 100 each
-            data += [sen_matrix]
+    data = pd.read_csv(filename, delimiter='ññ', header=None, engine='python')
+    with open('w2v/model/nce_embeddings.pkl','rb') as f:
+        emb = pk.load(f)
+    with open('w2v/model/nce_dict.pkl','rb') as f:
+        w_dict = pk.load(f)
+    new_data = []
+    for tweet in data[0][:]:
+        sen_matrix = []
+        for word in preprocess(tweet):
+            if word.startswith('@'):
+                word = '<USER/>'
+            elif word.startswith('http'):
+                word = '<URL/>'
+            elif word.startswith('#'):
+                word = '<HASHTAG/>'
+            else:
+                word = word.lower()
+            if word in w_dict:
+                sen_matrix += [ emb[ w_dict[ word ] ] ]
+            else:
+                sen_matrix += [ emb[ w_dict[ 'UNK' ] ] ]
+        ## UNK padding
+        missing = sen_len - len(sen_matrix)
+        for x in range(missing):
+            sen_matrix += [ emb[ w_dict[ 'UNK' ] ] ] ## embeddings of lenght 100 each
+        new_data += [sen_matrix]
     return np.array(data),np.array(pd.get_dummies(data[1][:]).as_matrix())
 
 class Cnn:
