@@ -43,17 +43,21 @@ def preprocess(s, lowercase=False):
     return tokens
 
 def read_data(filename, sen_len=400):
-    fin = open('data/distant-data.ds')
-    reader = csv.reader(fin)
-    new_data = []
-    labels = []
+    reader = open('data/distant-data.ds')
+    #reader = csv.reader(fin)
+    #new_data = []
+    #labels = []
     with open('w2v/model/nce_embeddings.pkl','rb') as f:
       emb = pk.load(f)
     with open('w2v/model/nce_dict.pkl','rb') as f:
       w_dict = pk.load(f)
+    vars = open('temp_sen_mat.pkl','wb')
     for elem in reader:
+      #print(elem)
+      #print(type(elem))
+      #print(elem.split('ññ'))
       text,label = elem.split('ññ')
-      labels += [label.strip()]
+      #labels += [label.strip()]
       sen_matrix = []
       for word in preprocess(text):
         if word.startswith('@'):
@@ -71,7 +75,8 @@ def read_data(filename, sen_len=400):
       missing = sen_len - len(sen_matrix)
       for x in range(missing):
         sen_matrix += [ emb[ w_dict[ 'UNK' ] ] ] ## embeddings of lenght 100 each
-      new_data += [sen_matrix]
+      #new_data += [sen_matrix]
+      pk.dump([[sen_matrix],[label.strip()]], vars)
     return np.array(data),np.array(pd.get_dummies(data[1][:]).as_matrix())
 
 class Cnn:
