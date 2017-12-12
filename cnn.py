@@ -42,46 +42,42 @@ def preprocess(s, lowercase=False):
         tokens = [token if emoticon_re.search(token) else token.lower() for token in tokens]
     return tokens
 
-def read_data(filename, sen_matrix_len=400):
-    data = pd.read_csv(filename, delimiter='ññ', header=None, engine='python')
-    tweets_text = data[0][:]
-    one_hot = pd.get_dummies(data[1][:])
-    labels = one_hot.as_matrix()
-    with open('w2v/model/nce_embeddings.pkl','rb') as f:
-        emb = pk.load(f)
-    with open('w2v/model/nce_dict.pkl','rb') as f:
-        w_dict = pk.load(f)
-    data = []
-    for tweet in tweets_text:
-        sen_matrix = []
-        for word in preprocess(tweet):
-            if word.startswith('@'):
-                word = '<USER/>'
-            elif word.startswith('http'):
-                word = '<URL/>'
-            elif word.startswith('#'):
-                word = '<HASHTAG/>'
-            else:
-                word = word.lower()
-            if word in w_dict:
-                sen_matrix += [ emb[ w_dict[ word ] ] ]
-            else:
-                sen_matrix += [ emb[ w_dict[ 'UNK' ] ]     ]
-        ## zero padding
-        missing = sen_matrix_len - len(sen_matrix)
-        for x in range(missing):
-            sen_matrix += [np.zeros(100)] ## embeddings of lenght 100 each
-        data += [sen_matrix]
-    # with open('data.pkl',"wb") as f:
-    #     pk.dump(data, f)
-    return np.array(data),np.array(labels)
+def read_data(filename, sen_len=400):
+    with pd.read_csv(filename, delimiter='ññ', header=None, engine='python') as data:
+        with open('w2v/model/nce_embeddings.pkl','rb') as f:
+            emb = pk.load(f)
+        with open('w2v/model/nce_dict.pkl','rb') as f:
+            w_dict = pk.load(f)
+        data = []
+        for tweet in data[0][:]:
+            sen_matrix = []
+            for word in preprocess(tweet):
+                if word.startswith('@'):
+                    word = '<USER/>'
+                elif word.startswith('http'):
+                    word = '<URL/>'
+                elif word.startswith('#'):
+                    word = '<HASHTAG/>'
+                else:
+                    word = word.lower()
+                if word in w_dict:
+                    sen_matrix += [ emb[ w_dict[ word ] ] ]
+                else:
+                    sen_matrix += [ emb[ w_dict[ 'UNK' ] ] ]
+            ## UNK padding
+            missing = sen_len - len(sen_matrix)
+            for x in range(missing):
+                sen_matrix += [ emb[ w_dict[ 'UNK' ] ] ## embeddings of lenght 100 each
+            data += [sen_matrix]
+    return np.array(data),np.array(pd.get_dummies(data[1][:]).as_matrix())
 
 class Cnn:
 
-  def __init__(self, d, m, fm):
+  def __init__(self, ss,d, m, fm):
     self.embed_size = d   ## size of the embeddings
     self.filter_size = m  ## size of the filter
-    self.fm_size = fm     ## feature maps number
+    self.fm_num = fm      ## feature maps number
+    self.sen_siz = ss     ## fixed size of sentence
     """ Creates the model """
     self.def_input()
     self.def_params()
@@ -90,13 +86,11 @@ class Cnn:
     self.def_loss()
     self.def_metrics()
     self.add_summaries()
-
   def def_input(self):
     """ Defines inputs """
     with tf.name_scope('input'):
       # placeholder for X
       self.X = tf.placeholder(tf.float32, [None, self.embed_size], name='X')
-      # self.X = tf.placeholder(tf.float32, [None, 28, 28, 1], name='X')
       # placeholder for Y
       self.Y_true = tf.placeholder(tf.float32, [None, 3], name='Y')
 
@@ -105,8 +99,8 @@ class Cnn:
     with tf.name_scope('params'):
       # First convolutional layer - maps one grayscale image to 2x32 feature maps.
       with tf.name_scope('conv'):
-        self.W_cn = self.weight_variable([5, self.embed_size, 1, self.fm_size])
-        self.b_cn = self.bias_variable([self.fm_size])
+        self.W_cn = self.weight_variable([5, self.embed_size, 1, self.fm_num])
+        self.b_cn = self.bias_variable([self.fm_num])
       with tf.name_scope('fc_softmax'):
         self.W_fc = self.weight_variable([300, 3]) ## por los 300 mapas de características reducidos por max pooling
         self.b_fc = self.bias_variable([3])
@@ -119,6 +113,9 @@ class Cnn:
     self.W_fcm = self.W_fc
     self.b_fcm = self.b_fc
     # First convolutional layer - maps one grayscale image to 32 feature maps.
+    with tf.name_scope('zero_padding'):
+      zero_x = tf.pad(self.Xm,[[0,0],[0,self.sen_siz - self.X.shape[0]]])
+
     with tf.name_scope('conv'):
       h_cn1 = tf.nn.relu(self.conv2d(self.Xm, self.W_cnm) + self.b_cnm)
     # Pooling layer - downsamples by 2X.
@@ -239,9 +236,9 @@ def run():
   data, labels = read_data('data/distant-data.ds')
   print("data size: ", len(data))
   # defines our model
-  model = Cnn(100, 5, 300)
+  model = Cnn(400, 100, 5, 300)
   # trains our model
-  model.train(data, np.array(labels))
+  model.train(data, labels)
 
 def main(args):
   run()
