@@ -4,11 +4,23 @@ import re
 import pandas as pd
 import pickle as pk
 import csv
+from pathlib import Path
 
-def next_batch(data, labels, batch_size):
-    import random
-    idxs = random.sample(range(labels.shape[0]), batch_size)
-    return [data[i] for i in idxs], labels[idxs]
+data_file = open('data/temp_dist_mat.pkl','rb')
+
+
+def next_batch(batch_size):
+    global data_file
+    x = []
+    y_true = []
+    for i in range(batch_size):
+        elem = pk.load(data_file)
+        x += elem[0]
+        if elem[1][0].startswith('po'):
+            y_true += [[1,0,0]]
+        else:
+            y_true += [[0,0,1]]
+    return x,y_true
 
 emoticons_str = r"""
     (?:
@@ -42,22 +54,15 @@ def preprocess(s, lowercase=False):
         tokens = [token if emoticon_re.search(token) else token.lower() for token in tokens]
     return tokens
 
-def read_data(filename, sen_len=400):
-    reader = open('data/distant-data.ds')
-    #reader = csv.reader(fin)
-    #new_data = []
-    #labels = []
+def read_data(filename, sen_len=400, outfile):
+    reader = open(filename)
     with open('w2v/model/nce_embeddings.pkl','rb') as f:
       emb = pk.load(f)
     with open('w2v/model/nce_dict.pkl','rb') as f:
       w_dict = pk.load(f)
-    vars = open('temp_sen_mat.pkl','wb')
+    vars = open(outfile,'wb')
     for elem in reader:
-      #print(elem)
-      #print(type(elem))
-      #print(elem.split('ññ'))
       text,label = elem.split('ññ')
-      #labels += [label.strip()]
       sen_matrix = []
       for word in preprocess(text):
         if word.startswith('@'):
@@ -75,9 +80,7 @@ def read_data(filename, sen_len=400):
       missing = sen_len - len(sen_matrix)
       for x in range(missing):
         sen_matrix += [ emb[ w_dict[ 'UNK' ] ] ] ## embeddings of lenght 100 each
-      #new_data += [sen_matrix]
       pk.dump([[sen_matrix],[label.strip()]], vars)
-    return np.array(data),np.array(pd.get_dummies(data[1][:]).as_matrix())
 
 class Cnn:
 
@@ -98,39 +101,46 @@ class Cnn:
     """ Defines inputs """
     with tf.name_scope('input'):
       # placeholder for X
-      self.X = tf.placeholder(tf.float32, [None, self.embed_size], name='X')
+      self.X = tf.placeholder(tf.float32, [sen_siz, self.embed_size], name='X')
       # placeholder for Y
       self.Y_true = tf.placeholder(tf.float32, [None, 3], name='Y')
+      self.l2_loss = tf.constant(0.0)
 
   def def_params(self):
     """ Defines model parameters """
     with tf.name_scope('params'):
       # First convolutional layer - maps one grayscale image to 2x32 feature maps.
       with tf.name_scope('conv'):
-        self.W_cn = self.weight_variable([5, self.embed_size, 1, self.fm_num])
-        self.b_cn = self.bias_variable([self.fm_num])
+        self.W_cn = self.weight_variable([5, self.embed_size, 1, self.fm_num], v_name="wcn")
+        self.b_cn = self.bias_variable([self.fm_num], v_name="bcn")
       with tf.name_scope('fc_softmax'):
-        self.W_fc = self.weight_variable([300, 3]) ## por los 300 mapas de características reducidos por max pooling
-        self.b_fc = self.bias_variable([3])
+        self.W_fc = self.weight_variable([300, 3], v_name="wfc") ## por los 300 mapas de características reducidos por max pooling
+        self.b_fc = self.bias_variable([3], name="bfc")
 
   def def_model(self):
     """ Defines the model """
-    self.Xm = self.X
-    self.W_cnm = self.W_cn
-    self.b_cnm = self.b_cn
-    self.W_fcm = self.W_fc
-    self.b_fcm = self.b_fc
+    Xm = self.X
+    W_cnm = self.W_cn
+    b_cnm = self.b_cn
+    W_fcm = self.W_fc
+    b_fcm = self.b_fc
     # First convolutional layer - maps one grayscale image to 32 feature maps.
     with tf.name_scope('zero_padding'):
-      zero_x = tf.pad(self.Xm,[[0,0],[0,self.sen_siz - self.X.shape[0]]])
+      zero_x = tf.pad(Xm,[[0,0],[0,self.sen_siz - self.X.shape[0]]])
 
     with tf.name_scope('conv'):
-      h_cn1 = tf.nn.relu(self.conv2d(self.Xm, self.W_cnm) + self.b_cnm)
+      h_cn1 = tf.nn.relu(tf.nn.bias_add(self.conv2d(Xm, W_cnm), b_cnm))
     # Pooling layer - downsamples by 2X.
     with tf.name_scope('max_pool'):
       h_max_pool = self.max_pool(h_cn1)
+    with tf.name_scope('dropout'):
+      h_drop = tf.nn.dropout(h_max_pool, .5) ## probabilidad de dropout
     with tf.name_scope('fc_softmax'):
-      self.Y_logt = tf.matmul(h_max_pool, self.W_fcm) + self.b_fcm
+      self.l2_loss += tf.nn.l2_loss(self.W_cn)
+      self.l2_loss += tf.nn.l2_loss(self.b_cn)
+      self.l2_loss += tf.nn.l2_loss(self.W_fc)
+      self.l2_loss += tf.nn.l2_loss(self.b_fc)
+      self.Y_logt = tf.nn.xw_plus_b(h_drop, W_fcm, b_fcm, name='scores')
       self.Y_pred = tf.nn.softmax(self.Y_logt)
 
   def def_output(self):
@@ -143,12 +153,9 @@ class Cnn:
     """ Defines loss function """
     with tf.name_scope('loss'):
       # cross entropy
-      self.cross_entropy = (tf.nn.softmax_cross_entropy_with_logits(labels=self.Y_true, logits=self.Y_logt) +
-                            0.01*tf.nn.l2_loss(self.W_cnm) +
-                            0.01*tf.nn.l2_loss(self.b_cnm) +
-                            0.01*tf.nn.l2_loss(self.W_fcm) +
-                            0.01*tf.nn.l2_loss(self.b_fcm))
-      self.loss = tf.reduce_mean(self.cross_entropy)
+      self.cross_entropy = (tf.nn.softmax_cross_entropy_with_logits(self.Y_logt,self.Y_true)
+      ### lambda de penalización = 0.0001
+      self.loss = tf.reduce_mean(self.cross_entropy)+0.001*self.l2_loss
 
   def def_metrics(self):
     """ Adds metrics """
@@ -168,26 +175,28 @@ class Cnn:
 
   def conv2d(self, x, W):
     """conv2d returns a 2d convolution layer with full stride."""
-    return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+    return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='VALID')
 
   def max_pool(self, x):
     """max_pool_2x2 downsamples a feature map by 2X."""
-    return tf.reduce_max(tf.reduce_max(x, axis=2),axis=0)
+    return tf.nn.max_pool(x, ksize=[1,self.sen_len-5+1,1,1],
+                        strides = [1,1,1,1],
+                        padding='VALID')
 
-  def weight_variable(self, shape):
+  def weight_variable(self, shape, v_name):
     """weight_variable generates a weight variable of a given shape."""
     initial = tf.truncated_normal(shape, stddev=0.1)
-    return tf.Variable(initial)
+    return tf.Variable(initial, name=v_name)
 
-  def bias_variable(self, shape):
+  def bias_variable(self, shape, v_name):
     """bias_variable generates a bias variable of a given shape."""
     initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
+    return tf.Variable(initial, name=v_name)
 
   def train(self, data, labels):
     """ Trains the model """
     # creates optimizer
-    grad = tf.train.AdadeltaOptimizer(learning_rate=1.0)
+    grad = tf.train.AdadeltaOptimizer(learning_rate=.95)
     # setup minimize function
     optimizer = grad.minimize(self.loss)
 
@@ -200,21 +209,13 @@ class Cnn:
       test_writer = tf.summary.FileWriter('graphs/sentiment_test')
       train_writer.add_graph(sess.graph)
 
-      #  batches
-      cut_idx = int(len(labels)*.2)
-      X_test, Y_test = data[cut_idx:], labels[cut_idx:]
-      tr_data = data[:cut_idx]
-      tr_labels = labels[:cut_idx]
-      del data
-      del labels
       # training loop
       for i in range(550*3):
 
         # train batch
-        #~ X_train, Y_train = data.train.next_batch(10)
-        X_train, Y_train = next_batch( tr_data, tr_labels, 200 )
+        X_train, Y_train = next_batch(1000)
 
-        #~ # evaluation with train data
+        # evaluation with train data
         feed_dict = {self.X: X_train, self.Y_true: Y_train}
         fetches = [self.loss, self.accuracy, self.summary]
         train_loss, train_acc, train_summary = sess.run(fetches, feed_dict=feed_dict)
@@ -242,7 +243,9 @@ class Cnn:
 def run():
   # Tensorflow integrates MNIST dataset
   print("reading data...")
-  data, labels = read_data('data/distant-data.ds')
+  if not Path("data/temp_dist_mat.pkl").exists():
+    read_data('data/distant-data.ds', sen_len=400, outfile='data/temp_dist_mat.pkl')
+
   # defines our model
   print("instantiating the model...")
   model = Cnn(400, 100, 5, 300)
