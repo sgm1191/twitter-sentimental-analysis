@@ -205,20 +205,22 @@ class Cnn:
 
     # opens session
     with tf.Session() as sess:
-      # initialize variables (params)
       sess.run(tf.global_variables_initializer())
+      # restore model
+      saver = tf.train.import_meta_graph('pre-model/pre-trained-model.meta')
+      saver.restore(sess,tf.train.latest_checkpoint('pre-model/'))
       # writers for TensorBorad
-      train_writer = tf.summary.FileWriter('graphs-pre/sentiment_train')
-      test_writer = tf.summary.FileWriter('graphs-pre/sentiment_test')
+      train_writer = tf.summary.FileWriter('graphs-semeval/sentiment_train')
+      test_writer = tf.summary.FileWriter('graphs-semeval/sentiment_test')
       train_writer.add_graph(sess.graph)
-      saver = tf.train.Saver()
+
 
       # training loop
       for i in range(788):
 
         # train batch
-        X_train, Y_train = next_batch(1000)
-        X_test, Y_test = next_batch(1000)
+        X_train, Y_train = next_batch(100)
+        X_test, Y_test = next_batch(100)
 
         # evaluation with train data
         feed_dict = {self.X: X_train, self.Y_true: Y_train}
@@ -244,7 +246,7 @@ class Cnn:
         msg = msg.format(i, train_loss, test_loss, train_acc, test_acc)
         print(msg)
         if i%100==0:
-          saver.save(sess, 'pre-model/pre-trained-model')
+          saver.save(sess, 'sem-model/semeval-model')
 
 
 
@@ -256,7 +258,7 @@ def run():
 
   # defines our model
   print("instantiating the model...")
-  model = Cnn(400, 100, 5, 300, 1000)
+  model = Cnn(400, 100, 5, 300, 100)
   # trains our model
   print("training the model...")
   model.train()
