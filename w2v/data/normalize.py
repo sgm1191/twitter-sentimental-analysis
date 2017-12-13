@@ -36,7 +36,7 @@ def preprocess(s, lowercase=False):
     return tokens
 
 
-filename = 'cleansed_150k.ds'
+filename = 'cleansed.ds'
 with open(filename) as f:
     for line in f:
         new_line = []

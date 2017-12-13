@@ -78,7 +78,7 @@ def read_data(filename):
                 data += [word]
     return data
 
-filename = 'data/n-cleansed_150k.ds'
+filename = 'data/cleansed.ds'
 vocabulary = read_data(filename)
 print('Data size = ', len(vocabulary))
 
@@ -181,7 +181,7 @@ with graph.as_default():
   valid_dataset = tf.constant(valid_examples, dtype=tf.int32)
 
   # Ops and variables pinned to the CPU because of missing GPU implementation
-  with tf.device('/cpu:0'): ## change for GPU
+  with tf.device('/gpu:0'): ## change for GPU
     # Look up embeddings for inputs.
     embeddings = tf.Variable(
         tf.random_uniform([vocabulary_size, embedding_size], -1.0, 1.0))
@@ -207,7 +207,7 @@ with graph.as_default():
                      num_classes=vocabulary_size))
 
   # Construct the SGD optimizer using a learning rate of 1.0.
-  optimizer = tf.train.GradientDescentOptimizer(1.0).minimize(loss)
+  optimizer = tf.train.GradientDescentOptimizer(.95).minimize(loss)
 
   # Compute the cosine similarity between minibatch examples and all embeddings.
   norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1, keep_dims=True))

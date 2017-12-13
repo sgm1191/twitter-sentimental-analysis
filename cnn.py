@@ -84,11 +84,12 @@ def read_data(filename, outfile, sen_len=400):
 
 class Cnn:
 
-  def __init__(self, ss,d, m, fm):
+  def __init__(self, ss,d, m, fm, b_size):
     self.embed_size = d   ## size of the embeddings
     self.filter_size = m  ## size of the filter
     self.fm_num = fm      ## feature maps number
     self.sen_siz = ss     ## fixed size of sentence
+    self.b_size = b_size
     """ Creates the model """
     self.def_input()
     self.def_params()
@@ -101,9 +102,9 @@ class Cnn:
     """ Defines inputs """
     with tf.name_scope('input'):
       # placeholder for X
-      self.X = tf.placeholder(tf.float32, [None,self.sen_siz, self.embed_size,1], name='X')
+      self.X = tf.placeholder(tf.float32, [self.b_size,self.sen_siz, self.embed_size], name='X')
       # placeholder for Y
-      self.Y_true = tf.placeholder(tf.float32, [None, 3], name='Y')
+      self.Y_true = tf.placeholder(tf.float32, [self.b_size, 3], name='Y')
       self.l2_loss = tf.constant(0.0)
 
   def def_params(self):
@@ -127,9 +128,10 @@ class Cnn:
     # First convolutional layer - maps one grayscale image to 32 feature maps.
     #with tf.name_scope('zero_padding'):
     #  zero_x = tf.pad(Xm,[[0,0],[0,self.sen_siz - self.X.shape[0]]])
-
+    with tf.name_scope('reshaping'):
+      x_re = tf.reshape(Xm,[self.b_size,self.sen_siz,self.embed_size,1])
     with tf.name_scope('conv'):
-      h_cn1 = tf.nn.relu(tf.nn.bias_add(self.conv2d(Xm, W_cnm), b_cnm))
+      h_cn1 = tf.nn.relu(tf.nn.bias_add(self.conv2d(x_re, W_cnm), b_cnm))
     # Pooling layer - downsamples by 2X.
     with tf.name_scope('max_pool'):
       h_max_pool = self.max_pool(h_cn1)
@@ -209,12 +211,14 @@ class Cnn:
       train_writer = tf.summary.FileWriter('graphs/sentiment_train')
       test_writer = tf.summary.FileWriter('graphs/sentiment_test')
       train_writer.add_graph(sess.graph)
+      saver = tf.train.Saver()
 
       # training loop
-      for i in range(550*3):
+      for i in range(788):
 
         # train batch
         X_train, Y_train = next_batch(1000)
+        X_test, Y_test = next_batch(1000)
 
         # evaluation with train data
         feed_dict = {self.X: X_train, self.Y_true: Y_train}
@@ -239,6 +243,9 @@ class Cnn:
         msg = "I{:3d} loss: ({:6.2f}, {:6.2f}), acc: ({:6.2f}, {:6.2f})"
         msg = msg.format(i, train_loss, test_loss, train_acc, test_acc)
         print(msg)
+        if i%100==0:
+          saver.save(sess, 'pre-trained-model')
+
 
 
 def run():
@@ -249,7 +256,7 @@ def run():
 
   # defines our model
   print("instantiating the model...")
-  model = Cnn(400, 100, 5, 300)
+  model = Cnn(400, 100, 5, 300, 1000)
   # trains our model
   print("training the model...")
   model.train()
