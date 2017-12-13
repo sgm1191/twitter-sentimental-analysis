@@ -6,7 +6,7 @@ import pickle as pk
 import csv
 from pathlib import Path
 
-data_file = open('data/temp_dist_mat.pkl','rb')
+data_file = open('data/temp_semeval_mat.pkl','rb')
 
 
 def next_batch(batch_size):
@@ -89,7 +89,7 @@ class Cnn:
     self.filter_size = m  ## size of the filter
     self.fm_num = fm      ## feature maps number
     self.sen_siz = ss     ## fixed size of sentence
-    self.b_size = b_size
+    self.b_size = b_size  ## batch size
     """ Creates the model """
     self.def_input()
     self.def_params()
@@ -100,7 +100,7 @@ class Cnn:
     self.add_summaries()
   def def_input(self):
     """ Defines inputs """
-    with tf.name_scope('input'):
+    with tf.name_scope('input2'):
       # placeholder for X
       self.X = tf.placeholder(tf.float32, [self.b_size,self.sen_siz, self.embed_size], name='X')
       # placeholder for Y
@@ -109,67 +109,83 @@ class Cnn:
 
   def def_params(self):
     """ Defines model parameters """
-    with tf.name_scope('params'):
-      # First convolutional layer - maps one grayscale image to 2x32 feature maps.
-      with tf.name_scope('conv'):
-        self.W_cn = self.weight_variable([self.filter_size, self.embed_size, 1, self.fm_num], v_name="wcn")
-        self.b_cn = self.bias_variable([self.fm_num], v_name="bcn")
+    with tf.name_scope('params2'):
       with tf.name_scope('fc_softmax'):
-        self.W_fc = self.weight_variable([self.fm_num, 3], v_name="wfc") ## por los 300 mapas de características reducidos por max pooling
-        self.b_fc = self.bias_variable([3], v_name="bfc")
+        self.W_fc = self.weight_variable([self.fm_num, 3], v_name="wfc2") ## por los 300 mapas de características reducidos por max pooling
+        self.b_fc = self.bias_variable([3], v_name="bfc2")
 
   def def_model(self):
     """ Defines the model """
     Xm = self.X
-    W_cnm = self.W_cn
-    b_cnm = self.b_cn
     W_fcm = self.W_fc
     b_fcm = self.b_fc
-    # First convolutional layer - maps one grayscale image to 32 feature maps.
-    #with tf.name_scope('zero_padding'):
-    #  zero_x = tf.pad(Xm,[[0,0],[0,self.sen_siz - self.X.shape[0]]])
-    with tf.name_scope('reshaping'):
+    with tf.name_scope('reshaping2'):
       x_re = tf.reshape(Xm,[self.b_size,self.sen_siz,self.embed_size,1])
-    with tf.name_scope('conv'):
-      h_cn1 = tf.nn.relu(tf.nn.bias_add(self.conv2d(x_re, W_cnm), b_cnm))
-    # Pooling layer - downsamples by 2X.
-    with tf.name_scope('max_pool'):
-      h_max_pool = self.max_pool(h_cn1)
-    with tf.name_scope('dropout'):
-      h_drop = tf.nn.dropout(h_max_pool, .5) ## probabilidad de dropout
-      h_flat = tf.reshape(h_drop,[-1,self.fm_num])
-    with tf.name_scope('fc_softmax'):
-      self.l2_loss += tf.nn.l2_loss(self.W_cn)
-      self.l2_loss += tf.nn.l2_loss(self.b_cn)
-      self.l2_loss += tf.nn.l2_loss(self.W_fc)
-      self.l2_loss += tf.nn.l2_loss(self.b_fc)
-      self.Y_logt = tf.nn.xw_plus_b(h_flat, W_fcm, b_fcm, name='scores')
+
+############################################################################
+    num_filters = 100
+    pooled_outputs = []
+    filter_sizes = [3,5,7]
+    for i, filter_size in enumerate(filter_sizes): ## filtros con diferente tamaño
+      with tf.name_scope("conv2-maxpool-%s" % filter_size):
+        # Convolution Layer
+        filter_shape = [filter_size, self.embed_size, 1, num_filters]
+        W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="W")
+        b = tf.Variable(tf.constant(0.1, shape=[num_filters]), name="b")
+        conv = tf.nn.conv2d( x_re,
+              W,
+              strides=[1, 1, 1, 1],
+              padding="VALID",
+              name="conv")
+
+        h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
+
+        pooled = tf.nn.avg_pool(
+              h,
+              ksize=[1, self.sen_siz - filter_size + 1, 1, 1],
+              strides=[1, 1, 1, 1],
+              padding='VALID',
+              name="pool")
+
+        pooled_outputs.append(pooled)
+    # Combine all the pooled features
+    num_filters_total = num_filters * len(filter_sizes)
+    h_pool = tf.concat(pooled_outputs,3, name="concat2")
+    h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
+
+############################################################################
+
+
+    with tf.name_scope('dropout2'):
+      h_drop = tf.nn.dropout(h_pool_flat, .4) ## probabilidad de dropout
+    with tf.name_scope('fc_softmax2'):
+      self.Y_logt = tf.nn.xw_plus_b(h_drop, W_fcm, b_fcm, name='scores')
       self.Y_pred = tf.nn.softmax(self.Y_logt)
 
   def def_output(self):
     """ Defines model output """
-    with tf.name_scope('output'):
+    with tf.name_scope('output2'):
       self.label_pred = tf.argmax(self.Y_pred, 1, name='label_pred')
       self.label_true = tf.argmax(self.Y_true, 1, name='label_true')
 
   def def_loss(self):
     """ Defines loss function """
-    with tf.name_scope('loss'):
+    with tf.name_scope('loss2'):
       # cross entropy
       self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=self.Y_logt,labels=self.Y_true)
       ### lambda de penalización = 0.0001
-      self.loss = tf.reduce_mean(self.cross_entropy)+0.001*self.l2_loss
+      self.loss = tf.reduce_mean(self.cross_entropy)
 
   def def_metrics(self):
     """ Adds metrics """
-    with tf.name_scope('metrics'):
+    with tf.name_scope('metrics2'):
       cmp_labels = tf.equal(self.label_true, self.label_pred)
       self.accuracy = tf.reduce_mean(tf.cast(cmp_labels, tf.float32), name='accuracy')
 
   def add_summaries(self):
     """ Adds summaries for Tensorboard """
     # defines a namespace for the summaries
-    with tf.name_scope('summaries'):
+    with tf.name_scope('summaries2'):
       # adds a plot for the loss
       tf.summary.scalar('loss', self.loss)
       tf.summary.scalar('accuracy', self.accuracy)
@@ -199,12 +215,13 @@ class Cnn:
   def train(self):
     """ Trains the model """
     # creates optimizer
-    grad = tf.train.AdadeltaOptimizer(learning_rate=.95)
+    grad = tf.train.AdamOptimizer(learning_rate=.95)
     # setup minimize function
     optimizer = grad.minimize(self.loss)
 
     # opens session
     with tf.Session() as sess:
+      # initialize variables (params)
       sess.run(tf.global_variables_initializer())
       # restore model
       saver = tf.train.import_meta_graph('pre-model/pre-trained-model.meta')
@@ -213,7 +230,7 @@ class Cnn:
       train_writer = tf.summary.FileWriter('graphs-semeval/sentiment_train')
       test_writer = tf.summary.FileWriter('graphs-semeval/sentiment_test')
       train_writer.add_graph(sess.graph)
-
+      saver = tf.train.Saver()
 
       # training loop
       for i in range(788):
@@ -252,9 +269,9 @@ class Cnn:
 
 def run():
   # Tensorflow integrates MNIST dataset
-  print("reading data...")
-  if not Path("data/temp_dist_mat.pkl").exists():
-    read_data(filename='data/distant-data.ds', sen_len=400, outfile='data/temp_dist_mat.pkl')
+  #print("reading data...")
+#  if not Path("data/temp_dist_mat.pkl").exists():
+ #   read_data(filename='data/distant-data.ds', sen_len=400, outfile='data/temp_dist_mat.pkl')
 
   # defines our model
   print("instantiating the model...")
