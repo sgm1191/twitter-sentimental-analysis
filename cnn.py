@@ -139,10 +139,6 @@ class Cnn:
       h_drop = tf.nn.dropout(h_max_pool, .5) ## probabilidad de dropout
       h_flat = tf.reshape(h_drop,[-1,self.fm_num])
     with tf.name_scope('fc_softmax'):
-      self.l2_loss += tf.nn.l2_loss(self.W_cn)
-      self.l2_loss += tf.nn.l2_loss(self.b_cn)
-      self.l2_loss += tf.nn.l2_loss(self.W_fc)
-      self.l2_loss += tf.nn.l2_loss(self.b_fc)
       self.Y_logt = tf.nn.xw_plus_b(h_flat, W_fcm, b_fcm, name='scores')
       self.Y_pred = tf.nn.softmax(self.Y_logt)
 
@@ -158,7 +154,7 @@ class Cnn:
       # cross entropy
       self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=self.Y_logt,labels=self.Y_true)
       ### lambda de penalización = 0.0001
-      self.loss = tf.reduce_mean(self.cross_entropy)+0.001*self.l2_loss
+      self.loss = tf.reduce_mean(self.cross_entropy)
 
   def def_metrics(self):
     """ Adds metrics """
