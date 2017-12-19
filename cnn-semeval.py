@@ -215,9 +215,10 @@ class Cnn:
   def train(self):
     """ Trains the model """
     # creates optimizer
-    grad = tf.train.AdamOptimizer(learning_rate=.95)
-    # setup minimize function
-    optimizer = grad.minimize(self.loss)
+    with tf.name_scope('adam_opt'):
+      grad = tf.train.AdamOptimizer(learning_rate=.95)
+      # setup minimize function
+      optimizer = grad.minimize(self.loss)
 
     # opens session
     with tf.Session() as sess:
@@ -233,11 +234,11 @@ class Cnn:
       saver = tf.train.Saver()
 
       # training loop
-      for i in range(788):
+      for i in range(340):
 
         # train batch
-        X_train, Y_train = next_batch(100)
-        X_test, Y_test = next_batch(100)
+        X_train, Y_train = next_batch(self.b_size)
+        X_test, Y_test = next_batch(self.b_size)
 
         # evaluation with train data
         feed_dict = {self.X: X_train, self.Y_true: Y_train}
@@ -262,20 +263,15 @@ class Cnn:
         msg = "I{:3d} loss: ({:6.2f}, {:6.2f}), acc: ({:6.2f}, {:6.2f})"
         msg = msg.format(i, train_loss, test_loss, train_acc, test_acc)
         print(msg)
-        if i%100==0:
+        if i%20==0:
           saver.save(sess, 'sem-model/semeval-model')
 
 
 
 def run():
-  # Tensorflow integrates MNIST dataset
-  #print("reading data...")
-#  if not Path("data/temp_dist_mat.pkl").exists():
- #   read_data(filename='data/distant-data.ds', sen_len=400, outfile='data/temp_dist_mat.pkl')
-
   # defines our model
   print("instantiating the model...")
-  model = Cnn(400, 100, 5, 300, 100)
+  model = Cnn(400, 100, 5, 300, 10)
   # trains our model
   print("training the model...")
   model.train()
